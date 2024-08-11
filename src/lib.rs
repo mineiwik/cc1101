@@ -707,33 +707,7 @@ where
     /// Should also be able to configure MCSM1.RXOFF_MODE to declare what state
     /// to enter after fully receiving a packet.
     /// Possible targets: IDLE, FSTON, TX, RX
-    pub fn receive(&mut self, addr: &mut u8, buf: &mut [u8]) -> Result<u8, Error<SpiE>> {
-        match self.rx_bytes_available() {
-            Ok(_nbytes) => {
-                let mut length: Option<u8> = Some(0);
-                let mut address: Option<u8> = Some(0);
-                self.read_data(&mut length, &mut address, buf)?;
-                *addr = address.unwrap();
-                let lqi = self.0.read_register(Status::LQI)?;
-                self.await_machine_state(MachineState::IDLE)?;
-                self.flush_rx_fifo_buffer()?;
-                if (lqi >> 7) != 1 {
-                    Err(Error::CrcMismatch)
-                } else {
-                    Ok(length.unwrap())
-                }
-            }
-            Err(err) => {
-                self.flush_rx_fifo_buffer()?;
-                Err(err)
-            }
-        }
-    }
-
-    /// Should also be able to configure MCSM1.RXOFF_MODE to declare what state
-    /// to enter after fully receiving a packet.
-    /// Possible targets: IDLE, FSTON, TX, RX
-    pub fn old_receive(&mut self, length: &mut u8, buf: &mut [u8]) -> Result<[u8; 2], Error<SpiE>> {
+    pub fn receive(&mut self, length: &mut u8, buf: &mut [u8]) -> Result<[u8; 2], Error<SpiE>> {
         if self.fetch_chip_state()? == State::RX {
             return Err(Error::InvalidState(1));
         }
