@@ -32,6 +32,23 @@ pub enum AddressFilter {
     DeviceHighLowBroadcast(u8),
 }
 
+/// Address check configuration.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum Power {
+    Power10Dbm = 0xC5,
+    Power5Dbm = 0x86,
+    Power0Dbm = 0x50,
+}
+
+/// GDO0 configuration.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum Gdo0Cfg {
+    /// Asserts when sync word has been sent / received, and de-asserts at the end of the packet. In RX, the pin will also de-assert when a packet is discarded due to address or maximum length filtering or when the radio enters RXFIFO_OVERFLOW state. In TX the pin will de-assert if the TX FIFO underflows
+    SyncWord = 0x06,
+}
+
 /// Sync word configuration.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SyncMode {

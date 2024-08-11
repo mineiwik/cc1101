@@ -94,6 +94,8 @@ pub enum Config {
     TEST1 = 0x2D,
     /// Various test settings
     TEST0 = 0x2E,
+    /// Power
+    PATABLE = 0x3E,
 }
 
 impl Config {

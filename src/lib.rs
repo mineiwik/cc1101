@@ -5,6 +5,11 @@ extern crate embedded_hal as hal;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "std")]
+use core::time::Duration;
+#[cfg(feature = "std")]
+use std::thread::sleep;
+
 use core::fmt::{self, Display, Formatter};
 use hal::spi::SpiDevice;
 
@@ -12,7 +17,7 @@ use hal::spi::SpiDevice;
 pub mod lowlevel;
 mod types;
 
-use lowlevel::{access::*, convert::*, registers::*};
+pub use lowlevel::{access::*, convert::*, registers::*};
 pub use lowlevel::{types::*, FIFO_SIZE_MAX};
 pub use types::*;
 
@@ -88,6 +93,26 @@ where
     /// Last Chip Status Byte
     pub fn get_chip_status(&mut self) -> Option<StatusByte> {
         self.0.status
+    }
+
+    /// Fetch the current state of the chip
+    /// Due to errata note, we need to read the status register twice by issuing a NOP command.
+    pub fn fetch_chip_state(&mut self) -> Result<State, Error<SpiE>> {
+        self.no_operation()?;
+        let mut old_state = self.get_chip_status().unwrap();
+        loop {
+            // we read 2 times due to errata note
+            self.no_operation()?;
+            let state = self.get_chip_status().unwrap();
+
+            if state == old_state {
+                return Ok(state.state);
+            }
+            old_state = state;
+
+            #[cfg(feature = "std")]
+            sleep(Duration::from_millis(20));
+        }
     }
 
     /// Command Strobe: Reset chip
@@ -192,6 +217,13 @@ where
         Ok(())
     }
 
+    pub fn set_max_dvga_gain(&mut self, gain: u8) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::AGCCTRL2, |r| {
+            AGCCTRL2(r).modify().max_dvga_gain(gain).bits()
+        })?;
+        Ok(())
+    }
+
     /// Sets the filter length (in FSK/MSK mode) or decision boundary (in OOK/ASK mode) for the AGC.
     pub fn set_filter_length(&mut self, filter_length: FilterLength) -> Result<(), Error<SpiE>> {
         self.0.modify_register(Config::AGCCTRL0, |r| {
@@ -231,6 +263,13 @@ where
     pub fn fec_enable(&mut self, enable: bool) -> Result<(), Error<SpiE>> {
         self.0.modify_register(Config::MDMCFG1, |r| {
             MDMCFG1(r).modify().fec_en(enable as u8).bits()
+        })?;
+        Ok(())
+    }
+
+    pub fn demodulator_freeze_enable(&mut self, enable: bool) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::FOCCFG, |r| {
+            FOCCFG(r).modify().foc_bs_cs_gate(enable as u8).bits()
         })?;
         Ok(())
     }
@@ -328,6 +367,39 @@ where
         Ok(())
     }
 
+    pub fn set_power(&mut self, power: Power) -> Result<(), Error<SpiE>> {
+        self.0.write_register(Config::PATABLE, power as u8)?;
+        Ok(())
+    }
+
+    pub fn set_gdo0_cfg(&mut self, cfg: Gdo0Cfg) -> Result<(), Error<SpiE>> {
+        self.0.write_register(Config::IOCFG0, cfg as u8)?;
+        Ok(())
+    }
+
+    pub fn set_fifo_threshold(&mut self, threshold: FifoThreshold) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::FIFOTHR, |r| {
+            FIFOTHR(r).modify().fifo_thr(threshold.into()).bits()
+        })?;
+        Ok(())
+    }
+
+    /// Debugging function to directly write registers
+    pub fn set_register<R>(&mut self, addr: R, value: u8) -> Result<(), Error<SpiE>>
+    where
+        R: Into<Register>,
+    {
+        self.0.write_register(addr, value)?;
+        Ok(())
+    }
+
+    pub fn adc_retention_enable(&mut self, enable: bool) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::MCSM2, |r| {
+            FIFOTHR(r).modify().adc_retention(enable as u8).bits()
+        })?;
+        Ok(())
+    }
+
     /// Turn data whitening on / off.
     pub fn white_data_enable(&mut self, enable: bool) -> Result<(), Error<SpiE>> {
         self.0.modify_register(Config::PKTCTRL0, |r| {
@@ -420,11 +492,24 @@ where
         let rxbytes = RXBYTES(self.0.read_register(Status::RXBYTES)?);
         let num_rxbytes: u8 = rxbytes.num_rxbytes();
 
-        if rxbytes.rxfifo_overflow() != 0 {
-            return Err(Error::RxOverflow);
-        }
+        //if rxbytes.rxfifo_overflow() != 0 {
+        //    return Err(Error::RxOverflow);
+        //}
 
         Ok(num_rxbytes)
+    }
+
+    fn await_chip_state(&mut self, target: State) -> Result<(), Error<SpiE>> {
+        loop {
+            let state = self.fetch_chip_state()?;
+            if state == target {
+                break;
+            }
+
+            #[cfg(feature = "std")]
+            sleep(Duration::from_millis(50));
+        }
+        Ok(())
     }
 
     /// Read data from FIFO
@@ -579,18 +664,44 @@ where
     }
 
     fn rx_bytes_available(&mut self) -> Result<u8, Error<SpiE>> {
-        let mut last = 0;
+        let num_rxbytes = self.get_rx_bytes()?;
+        Ok(num_rxbytes)
+    }
 
-        loop {
-            let num_rxbytes = self.get_rx_bytes()?;
+    fn tx_bytes(&mut self) -> Result<u8, Error<SpiE>> {
+        let num_txbytes = self.get_tx_bytes()?;
+        Ok(num_txbytes)
+    }
 
-            if (num_rxbytes > 0) && (num_rxbytes == last) {
-                break;
-            }
-
-            last = num_rxbytes;
+    pub fn set_idle_state(&mut self) -> Result<(), Error<SpiE>> {
+        self.0.write_cmd_strobe(Command::SIDLE)?;
+        while self.fetch_chip_state()? != State::IDLE {
+            #[cfg(feature = "std")]
+            sleep(Duration::from_millis(50));
         }
-        Ok(last)
+        Ok(())
+    }
+
+    pub fn set_rx_state(&mut self) -> Result<(), Error<SpiE>> {
+        loop {
+            let state = self.fetch_chip_state()?;
+            match state {
+                State::IDLE => self.0.write_cmd_strobe(Command::SIDLE)?,
+                State::RX => break,
+                State::RXFIFO_OVERFLOW => self.0.write_cmd_strobe(Command::SFRX)?,
+                State::TXFIFO_UNDERFLOW => self.0.write_cmd_strobe(Command::SFTX)?,
+                _ => {}
+            }
+            self.0.write_cmd_strobe(Command::SRX)?;
+            #[cfg(feature = "std")]
+            sleep(Duration::from_millis(50));
+        }
+        Ok(())
+    }
+
+    pub fn set_tx_state(&mut self) -> Result<(), Error<SpiE>> {
+        self.0.write_cmd_strobe(Command::STX)?;
+        Ok(())
     }
 
     /// Should also be able to configure MCSM1.RXOFF_MODE to declare what state
@@ -619,6 +730,82 @@ where
         }
     }
 
+    /// Should also be able to configure MCSM1.RXOFF_MODE to declare what state
+    /// to enter after fully receiving a packet.
+    /// Possible targets: IDLE, FSTON, TX, RX
+    pub fn old_receive(&mut self, length: &mut u8, buf: &mut [u8]) -> Result<[u8; 2], Error<SpiE>> {
+        if self.fetch_chip_state()? == State::RX {
+            return Err(Error::InvalidState(1));
+        }
+
+        match self.rx_bytes_available() {
+            Ok(_nbytes) => {
+                // Assume we are in variable packet length mode
+                // FIrst byte is the length of the packet
+                *length = self.0.read_fifo_single()?;
+
+                // Read the payload
+                if *length as usize > buf.len() {
+                    self.set_idle_state()?;
+                    self.flush_rx_fifo_buffer()?;
+                    self.set_rx_state()?;
+                    return Err(Error::RxOverflow);
+                }
+                self.0.read_fifo(buf, *length)?;
+
+                // Read status bytes (2 bytes)
+                let mut status = [0u8; 2];
+                self.0.read_fifo(&mut status, 2)?;
+
+                let lqi = status[1];
+                if (lqi >> 7) != 1 {
+                    Err(Error::CrcMismatch)
+                } else {
+                    Ok(status)
+                }
+            }
+            Err(err) => {
+                self.set_idle_state()?;
+                self.flush_rx_fifo_buffer()?;
+                self.set_rx_state()?;
+                Err(err)
+            }
+        }
+    }
+
+    pub fn transmit(&mut self, data: &mut [u8], length: u8) -> Result<(), Error<SpiE>> {
+        match self.tx_bytes() {
+            Ok(_) => {
+                self.set_idle_state()?;
+                self.flush_tx_fifo_buffer()?;
+                self.flush_rx_fifo_buffer()?;
+                self.set_idle_state()?;
+
+                self.await_chip_state(State::IDLE)?;
+
+                self.enable_tx()?;
+
+                // dismiss if state is 1 (RX)
+                // (mineiwik) probably no longer required
+                let state = self.fetch_chip_state()?;
+                if state == State::RX {
+                    return Err(Error::InvalidState(state as u8));
+                }
+
+                self.0.write_fifo_single(length as u8)?;
+                self.0.write_fifo(&mut data[0..length as usize])?;
+
+                self.await_chip_state(State::IDLE)?;
+
+                self.set_idle_state()?;
+                self.flush_tx_fifo_buffer()?;
+                self.set_rx_state()?;
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
+    }
+
     /// Configures raw data to be passed through, without any packet handling.
     pub fn set_raw_mode(&mut self) -> Result<(), Error<SpiE>> {
         // Serial data output.
@@ -627,4 +814,5 @@ where
         self.0.write_register(Config::PKTCTRL0, 0x30)?;
         Ok(())
     }
+
 }

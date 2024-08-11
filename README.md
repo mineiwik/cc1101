@@ -11,11 +11,8 @@
 
 ## What works
 
-- Configuring radio for reception, and reading data.
-
-## TODO
-
-- [ ] Sending data, but only have one module.
+- Configuring radio for reception & transmission
+- Reading & writing data.
 
 ## License
 

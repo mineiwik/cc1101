@@ -52,6 +52,49 @@ where
         Ok(buffer[1])
     }
 
+    pub fn read_fifo_single(&mut self) -> Result<u8, SpiE> {
+        let mut buffer =
+            [MultiByte::FIFO.addr(access::Access::Read, access::Mode::Single), BLANK_BYTE];
+
+        self.spi.transfer_in_place(&mut buffer)?;
+
+        self.status = Some(StatusByte::from(buffer[0]));
+        Ok(buffer[1])
+    }
+
+    pub fn read_fifo(&mut self, buf: &mut [u8], len: u8) -> Result<(), SpiE> {
+        let mut buffer = [MultiByte::FIFO.addr(access::Access::Read, access::Mode::Burst)];
+
+        self.spi.transaction(&mut [
+            Operation::TransferInPlace(&mut buffer),
+            Operation::TransferInPlace(&mut buf[0..len as usize]),
+        ])?;
+
+        self.status = Some(StatusByte::from(buffer[0]));
+        Ok(())
+    }
+
+    pub fn write_fifo_single(&mut self, data: u8) -> Result<(), SpiE> {
+        let mut buffer = [MultiByte::FIFO.addr(access::Access::Write, access::Mode::Single), data];
+
+        self.spi.transfer_in_place(&mut buffer)?;
+
+        self.status = Some(StatusByte::from(buffer[0]));
+        Ok(())
+    }
+
+    pub fn write_fifo(&mut self, data: &mut [u8]) -> Result<(), SpiE> {
+        let mut buffer = [MultiByte::FIFO.addr(access::Access::Write, access::Mode::Burst)];
+
+        self.spi.transaction(&mut [
+            Operation::TransferInPlace(&mut buffer),
+            Operation::TransferInPlace(data),
+        ])?;
+
+        self.status = Some(StatusByte::from(buffer[0]));
+        Ok(())
+    }
+
     pub fn access_fifo(
         &mut self,
         access: access::Access,
