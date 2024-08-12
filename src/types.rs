@@ -60,4 +60,6 @@ pub enum SyncMode {
     MatchPartialRepeated(u16),
     /// Match 16 of 16 bits of given sync word.
     MatchFull(u16),
+    /// Match 30 of 32 bits of a repetition of given sync word with carrier sense.
+    MatchPartialRepeatedCS(u16),
 }

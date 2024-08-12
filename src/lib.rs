@@ -193,6 +193,26 @@ where
         Ok(())
     }
 
+    pub fn set_fscal1(&mut self, value: u8) -> Result<(), Error<SpiE>> {
+        self.0.write_register(Config::FSCAL1, value)?;
+        Ok(())
+    }
+
+    pub fn set_fscal0(&mut self, value: u8) -> Result<(), Error<SpiE>> {
+        self.0.write_register(Config::FSCAL0, value)?;
+        Ok(())
+    }
+
+    pub fn set_test2(&mut self, test2: u8) -> Result<(), Error<SpiE>> {
+        self.0.write_register(Config::TEST2, test2)?;
+        Ok(())
+    }
+
+    pub fn set_test1(&mut self, test1: u8) -> Result<(), Error<SpiE>> {
+        self.0.write_register(Config::TEST1, test1)?;
+        Ok(())
+    }
+
     /// Sets the carrier frequency (in Hertz).
     pub fn set_frequency(&mut self, hz: u64) -> Result<(), Error<SpiE>> {
         let (freq0, freq1, freq2) = from_frequency(hz);
@@ -202,10 +222,22 @@ where
         Ok(())
     }
 
+    pub fn set_channel_number(&mut self, channel: u8) -> Result<(), Error<SpiE>> {
+        self.0.write_register(Config::CHANNR, channel)?;
+        Ok(())
+    }
+
     /// Sets the frequency synthesizer intermediate frequency (in Hertz).
     pub fn set_freq_if(&mut self, hz: u64) -> Result<(), Error<SpiE>> {
         self.0
             .write_register(Config::FSCTRL1, FSCTRL1::default().freq_if(from_freq_if(hz)).bits())?;
+        Ok(())
+    }
+
+    pub fn set_wor_res(&mut self, wor_res: u8) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::WORCTRL, |r| {
+            WORCTRL(r).modify().wor_res(wor_res).bits()
+        })?;
         Ok(())
     }
 
@@ -236,6 +268,13 @@ where
     pub fn set_autocalibration(&mut self, autocal: AutoCalibration) -> Result<(), Error<SpiE>> {
         self.0.modify_register(Config::MCSM0, |r| {
             MCSM0(r).modify().fs_autocal(autocal.into()).bits()
+        })?;
+        Ok(())
+    }
+
+    pub fn set_po_timeout(&mut self, timeout: PoTimeout) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::MCSM2, |r| {
+            MCSM0(r).modify().po_timeout(timeout.into()).bits()
         })?;
         Ok(())
     }
@@ -308,6 +347,7 @@ where
             SyncMode::MatchPartial(word) => (SyncCheck::CHECK_15_16, word),
             SyncMode::MatchPartialRepeated(word) => (SyncCheck::CHECK_30_32, word),
             SyncMode::MatchFull(word) => (SyncCheck::CHECK_16_16, word),
+            SyncMode::MatchPartialRepeatedCS(word) => (SyncCheck::CHECK_30_32_CS, word),
         };
         self.0.modify_register(Config::MDMCFG2, |r| {
             MDMCFG2(r).modify().sync_mode(mode.into()).bits()
@@ -342,6 +382,34 @@ where
     pub fn append_status_enable(&mut self, enable: bool) -> Result<(), Error<SpiE>> {
         self.0.modify_register(Config::PKTCTRL1, |r| {
             PKTCTRL1(r).modify().append_status(enable as u8).bits()
+        })?;
+        Ok(())
+    }
+
+    pub fn set_fscal3(&mut self, value: u8) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::FSCAL3, |r| {
+            FSCAL3(r).modify().fscal3(value).bits()
+        })?;
+        Ok(())
+    }
+
+    pub fn vco_core_enable(&mut self, enable: bool) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::FSCAL2, |r| {
+            FSCAL2(r).modify().vco_core_h_en(enable as u8).bits()
+        })?;
+        Ok(())
+    }
+
+    pub fn vco_sel_cal_enable(&mut self, enable: bool) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::TEST0, |r| {
+            TEST0(r).modify().vco_sel_cal_en(enable as u8).bits()
+        })?;
+        Ok(())
+    }
+
+    pub fn set_pqt(&mut self, pqt: u8) -> Result<(), Error<SpiE>> {
+        self.0.modify_register(Config::PKTCTRL1, |r| {
+            PKTCTRL1(r).modify().pqt(pqt).bits()
         })?;
         Ok(())
     }
@@ -394,7 +462,7 @@ where
     }
 
     pub fn adc_retention_enable(&mut self, enable: bool) -> Result<(), Error<SpiE>> {
-        self.0.modify_register(Config::MCSM2, |r| {
+        self.0.modify_register(Config::FIFOTHR, |r| {
             FIFOTHR(r).modify().adc_retention(enable as u8).bits()
         })?;
         Ok(())
