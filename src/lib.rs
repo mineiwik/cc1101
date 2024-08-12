@@ -17,7 +17,7 @@ use hal::spi::SpiDevice;
 pub mod lowlevel;
 mod types;
 
-pub use lowlevel::{access::*, convert::*, registers::*};
+use lowlevel::{access::*, convert::*, registers::*};
 pub use lowlevel::{types::*, FIFO_SIZE_MAX};
 pub use types::*;
 
@@ -449,15 +449,6 @@ where
         self.0.modify_register(Config::FIFOTHR, |r| {
             FIFOTHR(r).modify().fifo_thr(threshold.into()).bits()
         })?;
-        Ok(())
-    }
-
-    /// Debugging function to directly write registers
-    pub fn set_register<R>(&mut self, addr: R, value: u8) -> Result<(), Error<SpiE>>
-    where
-        R: Into<Register>,
-    {
-        self.0.write_register(addr, value)?;
         Ok(())
     }
 
