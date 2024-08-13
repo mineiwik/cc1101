@@ -235,9 +235,7 @@ where
     }
 
     pub fn set_wor_res(&mut self, wor_res: u8) -> Result<(), Error<SpiE>> {
-        self.0.modify_register(Config::WORCTRL, |r| {
-            WORCTRL(r).modify().wor_res(wor_res).bits()
-        })?;
+        self.0.modify_register(Config::WORCTRL, |r| WORCTRL(r).modify().wor_res(wor_res).bits())?;
         Ok(())
     }
 
@@ -388,9 +386,7 @@ where
     }
 
     pub fn set_fscal3(&mut self, value: u8) -> Result<(), Error<SpiE>> {
-        self.0.modify_register(Config::FSCAL3, |r| {
-            FSCAL3(r).modify().fscal3(value).bits()
-        })?;
+        self.0.modify_register(Config::FSCAL3, |r| FSCAL3(r).modify().fscal3(value).bits())?;
         Ok(())
     }
 
@@ -409,9 +405,7 @@ where
     }
 
     pub fn set_pqt(&mut self, pqt: u8) -> Result<(), Error<SpiE>> {
-        self.0.modify_register(Config::PKTCTRL1, |r| {
-            PKTCTRL1(r).modify().pqt(pqt).bits()
-        })?;
+        self.0.modify_register(Config::PKTCTRL1, |r| PKTCTRL1(r).modify().pqt(pqt).bits())?;
         Ok(())
     }
 
@@ -848,5 +842,4 @@ where
         self.0.write_register(Config::PKTCTRL0, 0x30)?;
         Ok(())
     }
-
 }
