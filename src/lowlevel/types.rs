@@ -12,6 +12,7 @@ mod packet_status;
 mod po_timeout;
 mod sync_check;
 mod target_amplitude;
+mod dvga_setting;
 
 pub use self::address_check::*;
 pub use self::auto_calibration::*;
@@ -27,3 +28,4 @@ pub use self::packet_status::*;
 pub use self::po_timeout::*;
 pub use self::sync_check::*;
 pub use self::target_amplitude::*;
+pub use self::dvga_setting::*;

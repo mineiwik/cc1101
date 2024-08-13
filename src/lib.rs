@@ -241,17 +241,18 @@ where
         Ok(())
     }
 
-    /// Sets the target value for the averaged amplitude from the digital channel filter.
-    pub fn set_magn_target(&mut self, target: TargetAmplitude) -> Result<(), Error<SpiE>> {
+    /// Sets the maximum allowed DVGA gain
+    pub fn set_max_dvga_gain(&mut self, dvga_setting: DVGASetting) -> Result<(), Error<SpiE>> {
         self.0.modify_register(Config::AGCCTRL2, |r| {
-            AGCCTRL2(r).modify().magn_target(target.into()).bits()
+            AGCCTRL2(r).modify().max_dvga_gain(dvga_setting.into()).bits()
         })?;
         Ok(())
     }
 
-    pub fn set_max_dvga_gain(&mut self, gain: u8) -> Result<(), Error<SpiE>> {
+    /// Sets the target value for the averaged amplitude from the digital channel filter.
+    pub fn set_magn_target(&mut self, target: TargetAmplitude) -> Result<(), Error<SpiE>> {
         self.0.modify_register(Config::AGCCTRL2, |r| {
-            AGCCTRL2(r).modify().max_dvga_gain(gain).bits()
+            AGCCTRL2(r).modify().magn_target(target.into()).bits()
         })?;
         Ok(())
     }
