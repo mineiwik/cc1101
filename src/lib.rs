@@ -436,13 +436,13 @@ where
         Ok(())
     }
 
-    pub fn set_power(&mut self, power: Power) -> Result<(), Error<SpiE>> {
-        self.0.write_register(Config::PATABLE, power as u8)?;
+    pub fn set_power(&mut self, power: PowerLevel) -> Result<(), Error<SpiE>> {
+        self.0.write_register(Config::PATABLE, power.into())?;
         Ok(())
     }
 
-    pub fn set_gdo0_cfg(&mut self, cfg: Gdo0Cfg) -> Result<(), Error<SpiE>> {
-        self.0.write_register(Config::IOCFG0, cfg as u8)?;
+    pub fn set_gdo0_cfg(&mut self, cfg: GdoCfg) -> Result<(), Error<SpiE>> {
+        self.0.write_register(Config::IOCFG0, cfg.into())?;
         Ok(())
     }
 
